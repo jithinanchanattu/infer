@@ -87,20 +87,17 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <summary>
         /// The collection of states.
         /// </summary>
-        [DataMember]
-        private List<StateData> statesData = new List<StateData>();
+        private StateCollection states = new List<StateData>();
 
         /// <summary>
         /// The start state.
         /// </summary>
-        [DataMember]
         private int startStateIndex;
 
         /// <summary>
         /// Whether the automaton is free of epsilon transition.
         /// If the value of this field is null, it means that the presence of epsilon transitions is unknown.
         /// </summary>
-        [DataMember]
         private bool? isEpsilonFree; // TODO: Isn't it always known?
 
         #endregion
@@ -135,7 +132,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// This should only be set non-null if this distribution is improper and there is 
         /// a need to override the actual automaton value. 
         /// </remarks>
-        [DataMember]
         public double? LogValueOverride
         {
             get;
@@ -150,7 +146,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <remarks>
         /// TODO: We need to develop more elegant automaton approximation methods, this is a simple placeholder for those.
         /// </remarks>
-        [DataMember]
         public double? PruneTransitionsWithLogWeightLessThan
         {
             get;
