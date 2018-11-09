@@ -6,6 +6,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 {
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
 
     using Microsoft.ML.Probabilistic.Distributions;
@@ -31,28 +32,132 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             private readonly Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner;
 
             /// <summary>
-            /// Cached value of owner.statesData. Cached for performance reasons.
+            /// TODO
             /// </summary>
-            private readonly List<StateData> statesData;
+            internal List<StateData> states;
 
             /// <summary>
             /// Initializes instance of <see cref="StateCollection"/>.
             /// </summary>
-            internal StateCollection(Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner, List<StateData> states)
+            internal StateCollection(
+                Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
+                List<StateData> initStates = null)
             {
                 this.owner = owner;
-                this.statesData = owner.statesData;
+                this.states = initStates ?? new List<StateData>();
             }
+
+            /// <summary>
+            /// Adds a new state to the automaton.
+            /// </summary>
+            /// <returns>The added state.</returns>
+            /// <remarks>Indices of the added states are guaranteed to be increasing consecutive.</remarks>
+            internal State Add()
+            {
+                if (this.states.Count >= maxStateCount)
+                {
+                    throw new AutomatonTooLargeException(MaxStateCount);
+                }
+
+                var index = this.states.Count;
+                var stateData = new StateData();
+                this.states.Add(stateData);
+
+                return new State(this.owner, index, stateData);
+            }
+
+            /// <summary>
+            /// Removes the state with a given index from the automaton.
+            /// </summary>
+            /// <param name="index">The index of the state to remove.</param>
+            /// <remarks>
+            /// The automaton representation we currently use does not allow for fast state removal.
+            /// Ideally we should get rid of this function completely.
+            /// </remarks>
+            internal void Remove(int index)
+            {
+                Debug.Assert(index >= 0 && index < this.states.Count, "An invalid state index provided.");
+                Debug.Assert(index != this.owner.startStateIndex, "Cannot remove the start state.");
+
+                this.states.RemoveAt(index);
+                var stateCount = this.states.Count;
+                for (var i = 0; i < stateCount; i++)
+                {
+                    StateData state = this.states[i];
+                    for (var j = state.TransitionCount - 1; j >= 0; j--)
+                    {
+                        var transition = state.GetTransition(j);
+                        if (transition.DestinationStateIndex == index)
+                        {
+                            state.RemoveTransition(j);
+                        }
+
+                        if (transition.DestinationStateIndex > index)
+                        {
+                            transition.DestinationStateIndex = transition.DestinationStateIndex - 1;
+                        }
+
+                        state.SetTransition(j, transition);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Adds the states in a given collection to the automaton together with their transitions,
+            /// but without attaching any of them to any of the existing states.
+            /// </summary>
+            /// <param name="statesToAdd">The states to add.</param>
+            /// <param name="group">The group for the transitions of the states being added.</param>
+            internal void Append(IReadOnlyList<State> statesToAdd, int group = 0)
+            {
+                Debug.Assert(statesToAdd != null, "A valid state collection must be provided.");
+
+                var startIndex = this.states.Count;
+                this.states.Capacity = this.states.Count + statesToAdd.Count;
+
+                // Add states
+                for (var i = 0; i < statesToAdd.Count; ++i)
+                {
+                    var newState = this.Add();
+                    newState.SetEndWeight(statesToAdd[i].EndWeight);
+
+                    Debug.Assert(newState.Index == i + startIndex, "State indices must always be consequent.");
+                }
+
+                // Add transitions
+                for (var i = 0; i < statesToAdd.Count; ++i)
+                {
+                    var stateToAdd = statesToAdd[i];
+                    for (var transitionIndex = 0; transitionIndex < stateToAdd.TransitionCount; transitionIndex++)
+                    {
+                        var transitionToAdd = stateToAdd.GetTransition(transitionIndex);
+                        Debug.Assert(transitionToAdd.DestinationStateIndex < statesToAdd.Count, "Self-inconsistent collection of states provided.");
+                        this[i + startIndex].AddTransition(
+                            transitionToAdd.ElementDistribution,
+                            transitionToAdd.Weight,
+                            this[transitionToAdd.DestinationStateIndex + startIndex],
+                            group != 0 ? group : transitionToAdd.Group);
+                    }
+                }
+            }
+
+            internal void SetTo(IReadOnlyList<State> that)
+            {
+                this.states.Clear();
+                this.Append(that);
+            }
+
+            #region IReadOnlyList<State> methods
 
             /// <summary>
             /// Gets state by its index.
             /// </summary>
-            public State this[int index] => new State(this.owner, index, this.statesData[index]);
+            public State this[int index] => new State(this.owner, index, this.states[index]);
 
             /// <summary>
             /// Gets number of states in collection.
             /// </summary>
-            public int Count => this.statesData.Count;
+            public int Count => this.states.Count;
 
             /// <summary>
             /// Returns enumerator over all states in collection.
@@ -60,7 +165,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public IEnumerator<State> GetEnumerator()
             {
                 var owner = this.owner;
-                return this.statesData.Select((data, index) => new State(owner, index, data)).GetEnumerator();
+                return this.states.Select((data, index) => new State(owner, index, data)).GetEnumerator();
             }
 
             /// <summary>
@@ -70,6 +175,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             {
                 return this.GetEnumerator();
             }
+
+            #endregion
         }
     }
 }

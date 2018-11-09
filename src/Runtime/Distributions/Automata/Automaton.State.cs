@@ -237,7 +237,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <returns>The destination state of the added transition.</returns>
             public State AddTransition(Transition transition)
             {
-                Argument.CheckIfValid(this.Owner == null || transition.DestinationStateIndex < this.Owner.statesData.Count, "transition", "The destination state index is not valid.");
+                Argument.CheckIfValid(this.Owner == null || transition.DestinationStateIndex < this.Owner.States.Count, "transition", "The destination state index is not valid.");
                 
                 this.Data.AddTransition(transition);
                 if (this.Owner.isEpsilonFree == true)
@@ -290,7 +290,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public void SetTransition(int index, Transition updatedTransition)
             {
                 Argument.CheckIfInRange(index >= 0 && index < this.TransitionCount, "index", "An invalid transition index given.");
-                Argument.CheckIfValid(updatedTransition.DestinationStateIndex < this.Owner.statesData.Count, "updatedTransition", "The destination state index is not valid.");
+                Argument.CheckIfValid(updatedTransition.DestinationStateIndex < this.Owner.States.Count, "updatedTransition", "The destination state index is not valid.");
 
                 if (updatedTransition.IsEpsilon)
                 {

@@ -21,7 +21,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         where TThis : Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis>, new()
     {
         /// <summary>
-        /// Represents a state of an automaton that is stored in the Automaton.statesData. This is an internal representation
+        /// Represents a state of an automaton that is stored in the Automaton.states. This is an internal representation
         /// of the state. <see cref="State"/> struct should be used in public APIs.
         /// </summary>
         [Serializable]

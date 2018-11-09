@@ -799,20 +799,21 @@ namespace Microsoft.ML.Probabilistic.Tests
                 new StringAutomaton.State(0, new[] { new StringAutomaton.Transition(DiscreteChar.PointMass('a'), Weight.One, 1) }, Weight.One),
                 new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One)
             };
-            var automaton1 = StringAutomaton.FromStates(states, states[0]);
+            var automaton1 = StringAutomaton.FromStates(states, 0);
             StringInferenceTestUtilities.TestValue(automaton1, 1.0, string.Empty, "a");
             StringInferenceTestUtilities.TestValue(automaton1, 0.0, "b");
 
             // Should work 2
-            var theOnlyState = new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.Zero);
-            var automaton2 = StringAutomaton.FromStates(new[] { theOnlyState }, theOnlyState);
+            var automaton2 = StringAutomaton.FromStates(
+                new[] { new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.Zero) },
+                0);
             Assert.True(automaton2.IsZero());
 
             // Null states collection
-            Assert.Throws<ArgumentNullException>(() => StringAutomaton.FromStates(null, default(StringAutomaton.State)));
+            Assert.Throws<ArgumentNullException>(() => StringAutomaton.FromStates(null, 0));
 
-            // Null start state
-            Assert.Throws<ArgumentException>(() => StringAutomaton.FromStates(new[] { theOnlyState }, default(StringAutomaton.State)));
+            // Bad start state index
+            Assert.Throws<ArgumentException>(() => StringAutomaton.FromStates(new StringAutomaton.State[] { }, 0));
 
             // Duplicate state indices
             Assert.Throws<ArgumentException>(
@@ -823,7 +824,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                             new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One),
                             new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One)
                         },
-                    new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One)));
+                    0));
 
             // State indices in a wrong order
             Assert.Throws<ArgumentException>(
@@ -834,7 +835,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                             new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One),
                             new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One)
                         },
-                    new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One)));
+                    0));
 
             // Indices are not zero-based
             Assert.Throws<ArgumentException>(
@@ -845,7 +846,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                             new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One),
                             new StringAutomaton.State(2, new StringAutomaton.Transition[0], Weight.One)
                         },
-                    new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One)));
+                    0));
 
             // Incorrect start state index
             Assert.Throws<ArgumentException>(
@@ -856,7 +857,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                             new StringAutomaton.State(0, new StringAutomaton.Transition[0], Weight.One),
                             new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One)
                         },
-                    new StringAutomaton.State(2, new StringAutomaton.Transition[0], Weight.One)));
+                    0));
 
             // Incorrect transition index
             Assert.Throws<ArgumentException>(
@@ -867,7 +868,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                             new StringAutomaton.State(0, new[] { new StringAutomaton.Transition(Option.None, Weight.One, 2) }, Weight.One),
                             new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One)
                         },
-                    new StringAutomaton.State(1, new StringAutomaton.Transition[0], Weight.One)));
+                    0));
         }
 
         #region ToString tests
