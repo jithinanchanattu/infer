@@ -48,6 +48,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             [DataMember]
             private int transitionCount;
 
+            internal int firstTransition;
+
             /// <summary>
             /// Initializes a new instance of the <see cref="StateData"/> class.
             /// </summary>

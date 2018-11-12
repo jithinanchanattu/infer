@@ -34,17 +34,21 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         public struct State : IEquatable<State>
         {
-            internal readonly StateData Data;
+            private readonly List<StateData> states;
 
             /// <summary>
             /// Initializes a new instance of <see cref="State"/> class. Used internally by automaton implementation
             /// to wrap StateData for use in public Automaton APIs.
             /// </summary>
-            internal State(Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner, int index, StateData data)
+            internal State(
+                Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
+                List<StateData> states,
+                int index)
             {
                 this.Owner = owner;
+                this.states = states;
                 this.Index = index;
-                this.Data = data;
+                this.Initialized = true;
             }
 
             /// <summary>
@@ -58,15 +62,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public State(int index, IEnumerable<Transition> transitions, Weight endWeight)
                 : this()
             {
+                throw new NotImplementedException();
+                /*
                 Argument.CheckIfInRange(index >= 0, "index", "State index must be non-negative.");
                 this.Index = index;
-                this.Data = new StateData(transitions, endWeight);
+                this.states[this.Index] = new StateData(transitions, endWeight);
+                */
             }
 
             /// <summary>
             /// Returns where this State represents some valid state in automaton.
             /// </summary>
-            public bool IsNull => this.Data == null;
+            public bool IsNull => !this.Initialized;
 
             /// <summary>
             /// Automaton to which this state belongs.
@@ -78,6 +85,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public int Index { get; }
 
+            public bool Initialized { get; }
+
             /// <summary>
             /// Gets or sets the ending weight of the state.
             /// </summary>
@@ -88,21 +97,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// to calling property setter but is not rejected by compiler.
             /// </remarks>
             public Weight EndWeight => this.Data.EndWeight;
-
-            /// <summary>
-            /// Sets the <see cref="EndWeight"/> property of State.
-            ///
-            /// Because <see cref="State"/> is a struct, trying to set <see cref="EndWeight"/> on it
-            /// (if property setter was provided) would result in compilation error. Compiler isn't
-            /// smart enough to see that setting property just updates the value in referenced <see cref="Data"/>.
-            /// Having a method call doesn't create this problem.
-            /// </summary>
-            /// <param name="weight">New end weight.</param>
-            public void SetEndWeight(Weight weight)
-            {
-                this.Data.EndWeight = weight;
-            }
-
+            
             /// <summary>
             /// Gets a value indicating whether the ending weight of this state is greater than zero.
             /// </summary>
@@ -113,6 +108,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public int TransitionCount => this.Data.TransitionCount;
 
+            internal StateData Data => this.states[this.Index];
+
             /// <summary>
             /// Creates the copy of the array of outgoing transitions. Used by quoting.
             /// </summary>
@@ -122,7 +119,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Compares 2 states for equality.
             /// </summary>
-            public static bool operator ==(State a, State b) => a.Data == b.Data;
+            public static bool operator ==(State a, State b) =>
+                ReferenceEquals(a.Owner, b.Owner) && a.Index == b.Index;
 
             /// <summary>
             /// Compares 2 states for inequality.
@@ -142,138 +140,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Returns HashCode of this state.
             /// </summary>
-            public override int GetHashCode() => this.Data?.GetHashCode() ?? 0;
-
-            /// <summary>
-            /// Adds a series of transitions labeled with the elements of a given sequence to the current state,
-            /// as well as the intermediate states. All the added transitions have unit weight.
-            /// </summary>
-            /// <param name="sequence">The sequence.</param>
-            /// <param name="destinationState">
-            /// The last state in the transition series.
-            /// If the value of this parameter is <see langword="null"/>, a new state will be created.
-            /// </param>
-            /// <param name="group">The group of the added transitions.</param>
-            /// <returns>The last state in the added transition series.</returns>
-            public State AddTransitionsForSequence(TSequence sequence, State destinationState = default(State), int group = 0)
-            {
-                var currentState = this;
-                using (var enumerator = sequence.GetEnumerator())
-                {
-                    var moveNext = enumerator.MoveNext();
-                    while (moveNext)
-                    {
-                        var element = enumerator.Current;
-                        moveNext = enumerator.MoveNext();
-                        currentState = currentState.AddTransition(
-                            element, Weight.One, moveNext ? default(State) : destinationState, group);
-                    }
-                }
-
-                return currentState;
-            }
-
-            /// <summary>
-            /// Adds a transition labeled with a given element to the current state.
-            /// </summary>
-            /// <param name="element">The element.</param>
-            /// <param name="weight">The transition weight.</param>
-            /// <param name="destinationState">
-            /// The destination state of the added transition.
-            /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
-            /// <param name="group">The group of the added transition.</param>
-            /// <returns>The destination state of the added transition.</returns>
-            public State AddTransition(TElement element, Weight weight, State destinationState = default(State), int group = 0)
-            {
-                return this.AddTransition(new TElementDistribution { Point = element }, weight, destinationState, group);
-            }
-
-            /// <summary>
-            /// Adds an epsilon transition to the current state.
-            /// </summary>
-            /// <param name="weight">The transition weight.</param>
-            /// <param name="destinationState">
-            /// The destination state of the added transition.
-            /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
-            /// <param name="group">The group of the added transition.</param>
-            /// <returns>The destination state of the added transition.</returns>
-            public State AddEpsilonTransition(Weight weight, State destinationState = default(State), int group = 0)
-            {
-                return this.AddTransition(Option.None, weight, destinationState, group);
-            }
-
-            /// <summary>
-            /// Adds a transition to the current state.
-            /// </summary>
-            /// <param name="elementDistribution">
-            /// The element distribution associated with the transition.
-            /// If the value of this parameter is <see langword="null"/>, an epsilon transition will be created.
-            /// </param>
-            /// <param name="weight">The transition weight.</param>
-            /// <param name="destinationState">
-            /// The destination state of the added transition.
-            /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
-            /// <param name="group">The group of the added transition.</param>
-            /// <returns>The destination state of the added transition.</returns>
-            public State AddTransition(Option<TElementDistribution> elementDistribution, Weight weight, State destinationState = default(State), int group = 0)
-            {
-                if (destinationState.IsNull)
-                {
-                    destinationState = this.Owner.AddState();
-                }
-                else if (!ReferenceEquals(destinationState.Owner, this.Owner))
-                {
-                    throw new ArgumentException("The given state belongs to another automaton.");
-                }
-
-                this.AddTransition(new Transition(elementDistribution, weight, destinationState.Index, group));
-                return destinationState;
-            }
-
-            /// <summary>
-            /// Adds a transition to the current state.
-            /// </summary>
-            /// <param name="transition">The transition to add.</param>
-            /// <returns>The destination state of the added transition.</returns>
-            public State AddTransition(Transition transition)
-            {
-                Argument.CheckIfValid(this.Owner == null || transition.DestinationStateIndex < this.Owner.States.Count, "transition", "The destination state index is not valid.");
-                
-                this.Data.AddTransition(transition);
-                if (this.Owner.isEpsilonFree == true)
-                {
-                    this.Owner.isEpsilonFree = !transition.IsEpsilon;
-                }
-
-                return this.Owner.States[transition.DestinationStateIndex];
-            }
-
-            /// <summary>
-            /// Adds a self-transition labeled with a given element to the current state.
-            /// </summary>
-            /// <param name="element">The element.</param>
-            /// <param name="weight">The transition weight.</param>
-            /// <param name="group">The group of the added transition.</param>
-            /// <returns>The current state.</returns>
-            public State AddSelfTransition(TElement element, Weight weight, int group = 0)
-            {
-                return this.AddTransition(element, weight, this, group);
-            }
-
-            /// <summary>
-            /// Adds a self-transition to the current state.
-            /// </summary>
-            /// <param name="elementDistribution">
-            /// The element distribution associated with the transition.
-            /// If the value of this parameter is <see langword="null"/>, an epsilon transition will be created.
-            /// </param>
-            /// <param name="weight">The transition weight.</param>
-            /// <param name="group">The group of the added transition.</param>
-            /// <returns>The current state.</returns>
-            public State AddSelfTransition(Option<TElementDistribution> elementDistribution, Weight weight, byte group = 0)
-            {
-                return this.AddTransition(elementDistribution, weight, this, group);
-            }
+            public override int GetHashCode() => this.Data.GetHashCode();
 
             /// <summary>
             /// Gets the transition at a specified index.
@@ -301,14 +168,21 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     this.Owner.isEpsilonFree = null;
                 }
 
-                this.Data.SetTransition(index, updatedTransition);
+                var data = this.Data;
+                data.SetTransition(index, updatedTransition);
+                this.states[this.Index] = data;
             }
 
             /// <summary>
             /// Removes the transition with a given index.
             /// </summary>
             /// <param name="index">The index of the transition to remove.</param>
-            public void RemoveTransition(int index) => this.Data.RemoveTransition(index);
+            public void RemoveTransition(int index)
+            {
+                var data = this.Data;
+                data.RemoveTransition(index);
+                this.states[this.Index] = data;
+            }
 
             /// <summary>
             /// Returns a string that represents the state.
@@ -540,39 +414,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         state => state.GetTransitions().Any(
                             transition => transition.DestinationStateIndex == this_.Index));
                 }
-            }
-
-
-            /// <summary>
-            /// Writes the automaton state.
-            /// </summary>
-            public void Write(Action<int> writeInt32, Action<double> writeDouble, Action<TElementDistribution> writeElementDistribution)
-            {
-                this.EndWeight.Write(writeDouble);
-                writeInt32(this.Index);
-                writeInt32(this.TransitionCount);
-                for (var i = 0; i < TransitionCount; i++)
-                {
-                    GetTransition(i).Write(writeInt32, writeDouble, writeElementDistribution);
-                }
-            }
-
-            /// <summary>
-            /// Reads the automaton state.
-            /// </summary>
-            public static State Read(Func<int> readInt32, Func<double> readDouble, Func<TElementDistribution> readElementDistribution)
-            {
-                var endWeight = Weight.Read(readDouble);
-                // Note: index is serialized for compatibility with old binary serializations
-                var index = readInt32();
-                var transitionCount = readInt32();
-                var transitions = new Transition[transitionCount];
-                for (var i = 0; i < transitionCount; i++)
-                {
-                    transitions[i] = Transition.Read(readInt32, readDouble, readElementDistribution);
-                }
-
-                return new State(index, transitions, endWeight);
             }
         }
     }
